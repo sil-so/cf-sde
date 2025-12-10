@@ -22,19 +22,14 @@ const FORM_CONFIG = {
   loadingText: "sending...",
   enableHoneypot: true,
   honeypotFieldNames: [
-    "honeypot_website",
-    "honeypot_url",
-    "honeypot_company_site",
-    "honeypot_business_url",
-    "bot_trap_website",
-    "bot_trap_url",
-    "spam_trap_site",
-    "spam_trap_link"
+    "honeypot_website", "honeypot_url", "honeypot_company_site",
+    "honeypot_business_url", "bot_trap_website", "bot_trap_url",
+    "spam_trap_site", "spam_trap_link",
   ],
   pageUrlField: {
     enabled: true,
-    fieldName: "Page URL"
-  }
+    fieldName: "Page URL",
+  },
 };
 
 class UniversalFormSecurityHandler {
@@ -71,9 +66,7 @@ class UniversalFormSecurityHandler {
       submitLabel: formElement.querySelector(FORM_CONFIG.submitLabelSelector),
       errorElement: formElement.querySelector(FORM_CONFIG.errorElementSelector),
       errorText: formElement.querySelector(FORM_CONFIG.errorTextSelector),
-      successElement: document.querySelector(
-        FORM_CONFIG.successElementSelector
-      ),
+      successElement: document.querySelector(FORM_CONFIG.successElementSelector),
       turnstileToken: null,
       turnstileWidgetId: null
     };
@@ -89,8 +82,7 @@ class UniversalFormSecurityHandler {
     config._securityChecksum = securityData.checksum;
 
     const formPurposeSecurity = this.secureFormPurpose(formElement);
-    config[formPurposeSecurity.propertyName] =
-      formPurposeSecurity.securedPurpose;
+    config[formPurposeSecurity.propertyName] = formPurposeSecurity.securedPurpose;
     config._purposeChecksum = formPurposeSecurity.checksum;
 
     // Mark form as initialized
@@ -102,51 +94,35 @@ class UniversalFormSecurityHandler {
 
     // Initial Load
     this.loadTurnstile(() => this.renderTurnstile(config));
-
+    
     // Setup Listeners
     this.setupFormSubmission(config);
-    this.setupRefreshListener(config); // New: Listen for modal re-opens
+    this.setupRefreshListener(config);
   }
 
-  /**
-   * New Method: Listens for external requests to refresh the security token.
-   * Useful for modals or single-page-app navigations.
-   */
   setupRefreshListener(config) {
-    config.formElement.addEventListener("cf-security-refresh", () => {
-      // 1. Remove existing widget if present
-      if (config.turnstileWidgetId && window.turnstile) {
-        try {
-          window.turnstile.remove(config.turnstileWidgetId);
-        } catch (e) {
-          /* ignore cleanup errors */
+    config.formElement.addEventListener('cf-security-refresh', () => {
+        if (config.turnstileWidgetId && window.turnstile) {
+            try { window.turnstile.remove(config.turnstileWidgetId); } catch(e) {}
         }
-      }
+        
+        config.turnstileToken = null;
+        config.turnstileWidgetId = null;
+        this.disableSubmitButton(config);
 
-      // 2. Clear token
-      config.turnstileToken = null;
-      config.turnstileWidgetId = null;
-      this.disableSubmitButton(config);
+        const container = config.formElement.querySelector(`.${FORM_CONFIG.turnstileContainerClass}`);
+        if(container) container.innerHTML = '';
 
-      // 3. Clean container HTML to ensure fresh render
-      const container = config.formElement.querySelector(
-        `.${FORM_CONFIG.turnstileContainerClass}`
-      );
-      if (container) container.innerHTML = "";
-
-      // 4. Re-render
-      if (window.turnstile) {
-        this.renderTurnstile(config);
-      } else {
-        this.loadTurnstile(() => this.renderTurnstile(config));
-      }
+        if(window.turnstile) {
+            this.renderTurnstile(config);
+        } else {
+            this.loadTurnstile(() => this.renderTurnstile(config));
+        }
     });
   }
 
   validateFieldConfiguration(formElement) {
-    const fields = formElement.querySelectorAll(
-      `[${FORM_CONFIG.fieldTypeAttribute}]`
-    );
+    const fields = formElement.querySelectorAll(`[${FORM_CONFIG.fieldTypeAttribute}]`);
     const errors = [];
     fields.forEach((field) => {
       const fieldType = field.getAttribute(FORM_CONFIG.fieldTypeAttribute);
@@ -154,11 +130,7 @@ class UniversalFormSecurityHandler {
       const fieldName = field.name || field.getAttribute("name");
 
       if (!fieldType) errors.push(`Field "${fieldName}" missing type`);
-      if (
-        !fieldData &&
-        fieldType !== "ignore" &&
-        fieldType !== "system-metadata"
-      ) {
+      if (!fieldData && fieldType !== "ignore" && fieldType !== "system-metadata") {
         errors.push(`Field "${fieldName}" missing data description`);
       }
       if (!fieldName) errors.push(`Field type "${fieldType}" missing name`);
@@ -169,9 +141,7 @@ class UniversalFormSecurityHandler {
   captureAndSecureFieldDescriptions(formElement) {
     const securedDescriptions = {};
     const originalDescriptions = {};
-    const fields = formElement.querySelectorAll(
-      `[${FORM_CONFIG.fieldDataAttribute}]`
-    );
+    const fields = formElement.querySelectorAll(`[${FORM_CONFIG.fieldDataAttribute}]`);
 
     fields.forEach((field) => {
       const fieldName = field.name || field.getAttribute("name");
@@ -184,16 +154,12 @@ class UniversalFormSecurityHandler {
 
     fields.forEach((field) => {
       field.removeAttribute(FORM_CONFIG.fieldDataAttribute);
-      field.setAttribute(
-        FORM_CONFIG.fieldDataAttribute,
-        "TAMPERED_CONTENT_DETECTED_" + Math.random().toString(36).substring(7)
-      );
+      field.setAttribute(FORM_CONFIG.fieldDataAttribute, "TAMPERED_CONTENT_DETECTED_" + Math.random().toString(36).substring(7));
     });
 
     const checksum = this.generateFieldIntegrityChecksum(originalDescriptions);
-    const propName = btoa("secured_" + Date.now())
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .substring(0, 16);
+    // Key length 16
+    const propName = btoa("secured_" + Date.now()).replace(/[^a-zA-Z0-9]/g, "").substring(0, 16);
 
     return {
       securedDescriptions: securedDescriptions,
@@ -206,7 +172,7 @@ class UniversalFormSecurityHandler {
     const str = JSON.stringify(descriptions, Object.keys(descriptions).sort());
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
       hash |= 0;
     }
     return Math.abs(hash).toString(36) + Date.now().toString(36);
@@ -214,18 +180,13 @@ class UniversalFormSecurityHandler {
 
   verifyFieldIntegrity(securedDescriptions, expectedChecksum) {
     const current = this.generateFieldIntegrityChecksum(securedDescriptions);
-    return (
-      current.split(Date.now().toString(36))[0] ===
-      expectedChecksum.split(/\d+$/)[0]
-    );
+    return current.split(Date.now().toString(36))[0] === expectedChecksum.split(/\d+$/)[0];
   }
 
   detectTamperingAttempt(formElement) {
-    const fields = formElement.querySelectorAll(
-      `[${FORM_CONFIG.fieldDataAttribute}]`
-    );
+    const fields = formElement.querySelectorAll(`[${FORM_CONFIG.fieldDataAttribute}]`);
     const attempts = [];
-    fields.forEach((field) => {
+    fields.forEach(field => {
       const val = field.getAttribute(FORM_CONFIG.fieldDataAttribute);
       if (val && !val.startsWith("TAMPERED_CONTENT_DETECTED_")) {
         attempts.push({ field: field.name, value: val });
@@ -236,19 +197,14 @@ class UniversalFormSecurityHandler {
 
   secureFormPurpose(formElement) {
     const original = formElement.getAttribute(FORM_CONFIG.formPurposeAttribute);
-    if (!original)
-      return { securedPurpose: null, propertyName: null, checksum: null };
+    if (!original) return { securedPurpose: null, propertyName: null, checksum: null };
 
     formElement.removeAttribute(FORM_CONFIG.formPurposeAttribute);
-    formElement.setAttribute(
-      FORM_CONFIG.formPurposeAttribute,
-      "TAMPERED_PURPOSE_" + Math.random().toString(36).substring(7)
-    );
+    formElement.setAttribute(FORM_CONFIG.formPurposeAttribute, "TAMPERED_PURPOSE_" + Math.random().toString(36).substring(7));
 
     const checksum = this.generateFormPurposeChecksum(original);
-    const propName = btoa("purpose_" + Date.now())
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .substring(0, 14);
+    // FIXED: Changed to length 15 to avoid collision with 'successElement' (14) and 'turnstileToken' (14)
+    const propName = btoa("purpose_" + Date.now()).replace(/[^a-zA-Z0-9]/g, "").substring(0, 15);
 
     return {
       securedPurpose: original,
@@ -261,7 +217,7 @@ class UniversalFormSecurityHandler {
     let hash = 0;
     if (!purpose) return hash.toString();
     for (let i = 0; i < purpose.length; i++) {
-      hash = (hash << 5) - hash + purpose.charCodeAt(i);
+      hash = ((hash << 5) - hash) + purpose.charCodeAt(i);
       hash |= 0;
     }
     return Math.abs(hash).toString(36) + Date.now().toString(36);
@@ -276,16 +232,9 @@ class UniversalFormSecurityHandler {
   }
 
   setupHoneypot(config) {
-    if (
-      !FORM_CONFIG.enableHoneypot ||
-      config.formElement.querySelector('input[data-honeypot="true"]')
-    )
-      return;
+    if (!FORM_CONFIG.enableHoneypot || config.formElement.querySelector('input[data-honeypot="true"]')) return;
 
-    const name =
-      FORM_CONFIG.honeypotFieldNames[
-        Math.floor(Math.random() * FORM_CONFIG.honeypotFieldNames.length)
-      ];
+    const name = FORM_CONFIG.honeypotFieldNames[Math.floor(Math.random() * FORM_CONFIG.honeypotFieldNames.length)];
     const input = document.createElement("input");
     input.type = "text";
     input.name = name;
@@ -293,9 +242,8 @@ class UniversalFormSecurityHandler {
     input.tabIndex = -1;
     input.autocomplete = "off";
     input.setAttribute("aria-hidden", "true");
-    input.style.cssText =
-      "position:absolute!important;left:-9999px!important;opacity:0!important;pointer-events:none!important;";
-
+    input.style.cssText = "position:absolute!important;left:-9999px!important;opacity:0!important;pointer-events:none!important;";
+    
     config.formElement.insertBefore(input, config.formElement.firstChild);
   }
 
@@ -327,18 +275,13 @@ class UniversalFormSecurityHandler {
   }
 
   renderTurnstile(config) {
-    let container = config.formElement.querySelector(
-      `.${FORM_CONFIG.turnstileContainerClass}`
-    );
+    let container = config.formElement.querySelector(`.${FORM_CONFIG.turnstileContainerClass}`);
     if (!container) {
       container = document.createElement("div");
       container.className = FORM_CONFIG.turnstileContainerClass;
       container.style.marginBottom = "20px";
       if (config.submitButton) {
-        config.submitButton.parentNode.insertBefore(
-          container,
-          config.submitButton
-        );
+        config.submitButton.parentNode.insertBefore(container, config.submitButton);
       } else {
         config.formElement.appendChild(container);
       }
@@ -353,33 +296,26 @@ class UniversalFormSecurityHandler {
       "error-callback": () => {
         config.turnstileToken = null;
         this.disableSubmitButton(config);
-        this.showError(
-          config,
-          "Security verification failed. Please try again."
-        );
+        this.showError(config, "Security verification failed. Please try again.");
       },
       "expired-callback": () => {
         config.turnstileToken = null;
         this.disableSubmitButton(config);
       },
       theme: FORM_CONFIG.turnstileTheme,
-      size: FORM_CONFIG.turnstileSize
+      size: FORM_CONFIG.turnstileSize,
     });
 
     this.disableSubmitButton(config);
   }
 
   setupFormSubmission(config) {
-    config.formElement.addEventListener(
-      "submit",
-      (e) => {
-        if (!config.formElement.checkValidity()) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        this.handleFormSubmit(config);
-      },
-      true
-    );
+    config.formElement.addEventListener("submit", (e) => {
+      if (!config.formElement.checkValidity()) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      this.handleFormSubmit(config);
+    }, true);
   }
 
   async handleFormSubmit(config) {
@@ -401,20 +337,20 @@ class UniversalFormSecurityHandler {
         referrer: document.referrer,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         formId: config.formId,
-        formPurpose: securedFormPurpose
+        formPurpose: securedFormPurpose,
       };
 
       const payload = {
         turnstileToken: config.turnstileToken,
         formData: formData,
         fieldTypes: formData.fieldTypes,
-        formPurpose: securedFormPurpose
+        formPurpose: securedFormPurpose,
       };
 
       const response = await fetch(this.workerUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -423,10 +359,7 @@ class UniversalFormSecurityHandler {
         this.handleSuccess(config);
       } else {
         this.resetTurnstileOnError(config);
-        this.showError(
-          config,
-          result.error?.message || "Something went wrong."
-        );
+        this.showError(config, result.error?.message || "Something went wrong.");
       }
     } catch (error) {
       this.resetTurnstileOnError(config);
@@ -444,22 +377,17 @@ class UniversalFormSecurityHandler {
     const tamperingAttempts = this.detectTamperingAttempt(config.formElement);
     const purposeTamper = this.detectFormPurposeTampering(config.formElement);
 
-    const inputs = config.formElement.querySelectorAll(
-      "input, textarea, select"
-    );
-
-    // Find security key
-    const secKey = Object.keys(config).find((k) =>
-      k.match(/^[A-Za-z0-9]{16}$/)
-    );
-
+    const inputs = config.formElement.querySelectorAll("input, textarea, select");
+    
+    // Find security key (16 chars)
+    const secKey = Object.keys(config).find(k => k.match(/^[A-Za-z0-9]{16}$/) && typeof config[k] === 'object');
+    
     inputs.forEach((input) => {
       if (!input.name || input.type === "submit") return;
 
       if (input.type === "checkbox") formData[input.name] = input.checked;
-      else if (input.type === "radio") {
-        if (input.checked) formData[input.name] = input.value;
-      } else formData[input.name] = input.value;
+      else if (input.type === "radio") { if (input.checked) formData[input.name] = input.value; }
+      else formData[input.name] = input.value;
 
       const type = input.getAttribute(FORM_CONFIG.fieldTypeAttribute);
       if (type) fieldTypes[input.name] = type;
@@ -469,16 +397,22 @@ class UniversalFormSecurityHandler {
       }
     });
 
+    // FIXED: Form Purpose Retrieval
+    // Use fallback to original config (if available)
     let securedPurpose = config.formPurpose;
-    const purposeKey = Object.keys(config).find((k) =>
-      k.match(/^[A-Za-z0-9]{14}$/)
+
+    // Strict lookup for 15-char string key (to match secureFormPurpose generation)
+    const purposeKey = Object.keys(config).find(k => 
+      k.match(/^[A-Za-z0-9]{15}$/) && 
+      typeof config[k] === 'string'
     );
-    if (purposeKey && config[purposeKey]) securedPurpose = config[purposeKey];
+
+    if (purposeKey && config[purposeKey]) {
+        securedPurpose = config[purposeKey];
+    }
 
     if (FORM_CONFIG.enableHoneypot) {
-      const honey = config.formElement.querySelector(
-        'input[data-honeypot="true"]'
-      );
+      const honey = config.formElement.querySelector('input[data-honeypot="true"]');
       if (honey) {
         formData._honeypot_field_name = honey.name;
         formData._honeypot_filled = honey.value !== "";
@@ -486,8 +420,7 @@ class UniversalFormSecurityHandler {
     }
 
     formData._security_level = "ENHANCED";
-    formData._tampering_attempts =
-      tamperingAttempts.length + (purposeTamper.detected ? 1 : 0);
+    formData._tampering_attempts = tamperingAttempts.length + (purposeTamper.detected ? 1 : 0);
     formData.fieldTypes = fieldTypes;
     formData.fieldDataDescriptions = fieldDataDescriptions;
 
@@ -542,8 +475,7 @@ class UniversalFormSecurityHandler {
   }
 
   hideError(config) {
-    if (config.errorElement)
-      config.errorElement.classList.add(FORM_CONFIG.hideClass);
+    if (config.errorElement) config.errorElement.classList.add(FORM_CONFIG.hideClass);
   }
 
   handleSuccess(config) {
